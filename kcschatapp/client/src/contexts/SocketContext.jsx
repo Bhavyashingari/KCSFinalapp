@@ -2,6 +2,7 @@ import { SOCKET_HOST } from "@/lib/constants";
 import { useAppStore } from "@/store";
 import React, { createContext, useContext, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import { toast } from "sonner";
 
 const SocketContext = createContext(null);
 
@@ -33,11 +34,16 @@ export const SocketProvider = ({ children }) => {
         } = useAppStore.getState();
 
         if (
-          currentChatType !== undefined &&
+          currentChatType === "contact" &&
+          currentChatData &&
           (currentChatData._id === message.sender._id ||
             currentChatData._id === message.recipient._id)
         ) {
           addMessage(message);
+        } else {
+          toast.info(
+            `New message from ${message.sender.firstName} ${message.sender.lastName}`
+          );
         }
         addContactInDMContacts(message);
       };
@@ -48,13 +54,20 @@ export const SocketProvider = ({ children }) => {
           selectedChatType,
           addMessage,
           addChannelInChannelLists,
+          channels,
         } = useAppStore.getState();
 
         if (
-          selectedChatType !== undefined &&
+          selectedChatType === "channel" &&
+          selectedChatData &&
           selectedChatData._id === message.channelId
         ) {
           addMessage(message);
+        } else {
+          const channel = channels.find((c) => c._id === message.channelId);
+          if (channel) {
+            toast.info(`New message in #${channel.name}`);
+          }
         }
         addChannelInChannelLists(message);
       };
@@ -64,9 +77,46 @@ export const SocketProvider = ({ children }) => {
         addChannel(channel);
       };
 
+      const handleMessageDeleted = ({ messageId }) => {
+        const { deleteMessage } = useAppStore.getState();
+        deleteMessage(messageId);
+      };
+
+      const handleMessageEdited = ({ updatedMessage }) => {
+        const { editMessage } = useAppStore.getState();
+        editMessage(updatedMessage);
+      };
+
+      const handleMessagePinned = ({ pinnedMessage }) => {
+        const { addPinnedMessage } = useAppStore.getState();
+        addPinnedMessage(pinnedMessage);
+      };
+
+      const handleMessageUnpinned = ({ messageId }) => {
+        const { removePinnedMessage } = useAppStore.getState();
+        removePinnedMessage(messageId);
+      };
+
+      const handleDmClosed = ({ recipientId }) => {
+        const { directMessagesContacts } = useAppStore.getState();
+        const contact = directMessagesContacts.find(
+          (c) => c._id === recipientId
+        );
+        if (contact) {
+          toast.error(
+            `${contact.firstName} ${contact.lastName} has closed their DMs.`
+          );
+        }
+      };
+
       socket.current.on("receiveMessage", handleReceiveMessage);
-      socket.current.on("recieve-channel-message", handleReceiveChannelMessage);
+      socket.current.on("receive-channel-message", handleReceiveChannelMessage);
       socket.current.on("new-channel-added", addNewChannel);
+      socket.current.on("message-deleted", handleMessageDeleted);
+      socket.current.on("message-edited", handleMessageEdited);
+      socket.current.on("message-pinned", handleMessagePinned);
+      socket.current.on("message-unpinned", handleMessageUnpinned);
+      socket.current.on("dm-closed", handleDmClosed);
 
       return () => {
         socket.current.disconnect();

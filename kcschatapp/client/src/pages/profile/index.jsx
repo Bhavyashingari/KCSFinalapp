@@ -8,6 +8,7 @@ import {
   HOST,
   REMOVE_PROFILE_IMAGE_ROUTE,
   UPDATE_PROFLE_ROUTE,
+  TOGGLE_DM_ROUTE,
 } from "@/lib/constants";
 import { useState, useRef, useEffect } from "react";
 import { FaPlus, FaTrash } from "react-icons/fa";
@@ -15,9 +16,11 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { IoArrowBack } from "react-icons/io5";
 import { colors } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const Profile = () => {
-  const { userInfo, setUserInfo } = useAppStore();
+  const { userInfo, setUserInfo, toggleDmInUserInfo } = useAppStore();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [image, setImage] = useState(null);
@@ -69,6 +72,23 @@ const Profile = () => {
       } catch (error) {
         console.log(error);
       }
+    }
+  };
+
+  const handleToggleDm = async () => {
+    try {
+      const response = await apiClient.post(
+        TOGGLE_DM_ROUTE,
+        {},
+        { withCredentials: true }
+      );
+      if (response.status === 200) {
+        toggleDmInUserInfo(response.data.isDmClosed);
+        toast.success("DM settings updated successfully.");
+      }
+    } catch (error) {
+      console.log(error);
+      toast.error("Error updating DM settings.");
     }
   };
 
@@ -212,6 +232,14 @@ const Profile = () => {
                   onClick={() => setSelectedColor(index)}
                 ></div>
               ))}
+            </div>
+            <div className="w-full flex items-center gap-5">
+              <Label htmlFor="dm-switch">Close DMs</Label>
+              <Switch
+                id="dm-switch"
+                checked={userInfo.isDmClosed}
+                onCheckedChange={handleToggleDm}
+              />
             </div>
           </div>
         </div>

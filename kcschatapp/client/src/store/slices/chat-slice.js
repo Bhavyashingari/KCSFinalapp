@@ -8,6 +8,18 @@ export const createChatSlice = (set, get) => ({
   fileUploadProgress: 0,
   isDownloading: false,
   downloadProgress: 0,
+  pinnedMessages: [],
+  showPinnedMessages: false,
+  setShowPinnedMessages: (show) => set({ showPinnedMessages: show }),
+  setPinnedMessages: (pinnedMessages) => set({ pinnedMessages }),
+  addPinnedMessage: (message) =>
+    set((state) => ({ pinnedMessages: [message, ...state.pinnedMessages] })),
+  removePinnedMessage: (messageId) =>
+    set((state) => ({
+      pinnedMessages: state.pinnedMessages.filter(
+        (msg) => msg._id !== messageId
+      ),
+    })),
   setIsUploading: (isUploading) => set({ isUploading }),
   setFileUploadProgress: (fileUploadProgress) => set({ fileUploadProgress }),
   setIsDownloading: (isDownloading) => set({ isDownloading }),
@@ -44,6 +56,23 @@ export const createChatSlice = (set, get) => ({
         },
       ],
     });
+  },
+  deleteMessage: (messageId) => {
+    const selectedChatMessages = get().selectedChatMessages;
+    const newMessages = selectedChatMessages.filter(
+      (msg) => msg._id !== messageId
+    );
+    set({ selectedChatMessages: newMessages });
+  },
+  editMessage: (message) => {
+    const selectedChatMessages = get().selectedChatMessages;
+    const messageIndex = selectedChatMessages.findIndex(
+      (msg) => msg._id === message._id
+    );
+    if (messageIndex !== -1) {
+      selectedChatMessages[messageIndex] = message;
+      set({ selectedChatMessages: [...selectedChatMessages] });
+    }
   },
   addChannel: (channel) => {
     const channels = get().channels;

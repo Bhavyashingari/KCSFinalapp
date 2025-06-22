@@ -24,6 +24,13 @@ const channelSchema = new mongoose.Schema({
       required: false,
     },
   ],
+  pinnedMessages: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Messages",
+      required: false,
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

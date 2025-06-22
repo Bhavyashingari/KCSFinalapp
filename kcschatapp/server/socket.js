@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from "socket.io";
 import Message from "./model/MessagesModel.js";
 import Channel from "./model/ChannelModel.js";
+import User from "./model/UserModel.js";
 
 const setupSocket = (server) => {
   const io = new SocketIOServer(server, {
@@ -25,6 +26,17 @@ const setupSocket = (server) => {
   };
 
   const sendMessage = async (message) => {
+    const recipient = await User.findById(message.recipient);
+    if (recipient && recipient.isDmClosed) {
+      const senderSocketId = userSocketMap.get(message.sender);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("dm-closed", {
+          recipientId: message.recipient,
+        });
+      }
+      return;
+    }
+
     const recipientSocketId = userSocketMap.get(message.recipient);
     const senderSocketId = userSocketMap.get(message.sender);
 
@@ -77,12 +89,102 @@ const setupSocket = (server) => {
       channel.members.forEach((member) => {
         const memberSocketId = userSocketMap.get(member._id.toString());
         if (memberSocketId) {
-          io.to(memberSocketId).emit("recieve-channel-message", finalData);
+          io.to(memberSocketId).emit("receive-channel-message", finalData);
         }
       });
       const adminSocketId = userSocketMap.get(channel.admin._id.toString());
       if (adminSocketId) {
-        io.to(adminSocketId).emit("recieve-channel-message", finalData);
+        io.to(adminSocketId).emit("receive-channel-message", finalData);
+      }
+    }
+  };
+
+  const deleteMessage = async ({ messageId, recipient, sender, channelId }) => {
+    if (recipient) {
+      // Direct message
+      const recipientSocketId = userSocketMap.get(recipient.toString());
+      const senderSocketId = userSocketMap.get(sender.toString());
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("message-deleted", { messageId });
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("message-deleted", { messageId });
+      }
+    } else {
+      // Channel message
+      const channel = await Channel.findById(channelId).populate("members");
+      if (channel && channel.members) {
+        channel.members.forEach((member) => {
+          const memberSocketId = userSocketMap.get(member._id.toString());
+          if (memberSocketId) {
+            io.to(memberSocketId).emit("message-deleted", { messageId });
+          }
+        });
+        const adminSocketId = userSocketMap.get(channel.admin._id.toString());
+        if (adminSocketId) {
+          io.to(adminSocketId).emit("message-deleted", { messageId });
+        }
+      }
+    }
+  };
+
+  const editMessage = async ({ updatedMessage, recipient, channelId }) => {
+    if (recipient) {
+      // Direct message
+      const recipientSocketId = userSocketMap.get(recipient._id.toString());
+      const senderSocketId = userSocketMap.get(updatedMessage.sender._id.toString());
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("message-edited", { updatedMessage });
+      }
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("message-edited", { updatedMessage });
+      }
+    } else {
+      // Channel message
+      const channel = await Channel.findById(channelId).populate("members");
+      if (channel && channel.members) {
+        channel.members.forEach((member) => {
+          const memberSocketId = userSocketMap.get(member._id.toString());
+          if (memberSocketId) {
+            io.to(memberSocketId).emit("message-edited", { updatedMessage });
+          }
+        });
+        const adminSocketId = userSocketMap.get(channel.admin._id.toString());
+        if (adminSocketId) {
+          io.to(adminSocketId).emit("message-edited", { updatedMessage });
+        }
+      }
+    }
+  };
+
+  const pinMessage = async ({ channelId, pinnedMessage }) => {
+    const channel = await Channel.findById(channelId).populate("members");
+    if (channel && channel.members) {
+      channel.members.forEach((member) => {
+        const memberSocketId = userSocketMap.get(member._id.toString());
+        if (memberSocketId) {
+          io.to(memberSocketId).emit("message-pinned", { pinnedMessage });
+        }
+      });
+      const adminSocketId = userSocketMap.get(channel.admin._id.toString());
+      if (adminSocketId) {
+        io.to(adminSocketId).emit("message-pinned", { pinnedMessage });
+      }
+    }
+  };
+
+  const unpinMessage = async ({ channelId, messageId }) => {
+    const channel = await Channel.findById(channelId).populate("members");
+    if (channel && channel.members) {
+      channel.members.forEach((member) => {
+        const memberSocketId = userSocketMap.get(member._id.toString());
+        if (memberSocketId) {
+          io.to(memberSocketId).emit("message-unpinned", { messageId });
+        }
+      });
+      const adminSocketId = userSocketMap.get(channel.admin._id.toString());
+      if (adminSocketId) {
+        io.to(adminSocketId).emit("message-unpinned", { messageId });
       }
     }
   };
@@ -112,6 +214,13 @@ const setupSocket = (server) => {
     socket.on("sendMessage", sendMessage);
 
     socket.on("send-channel-message", sendChannelMessage);
+
+    socket.on("delete-message", deleteMessage);
+
+    socket.on("edit-message", editMessage);
+
+    socket.on("pin-message", pinMessage);
+    socket.on("unpin-message", unpinMessage);
 
     socket.on("disconnect", () => disconnect(socket));
   });

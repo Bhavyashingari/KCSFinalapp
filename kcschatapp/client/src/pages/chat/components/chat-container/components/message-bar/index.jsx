@@ -5,8 +5,9 @@ import EmojiPicker from "emoji-picker-react";
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/store";
 import { useSocket } from "@/contexts/SocketContext";
-import { MESSAGE_TYPES, UPLOAD_FILE } from "@/lib/constants";
+import { MESSAGE_TYPES, UPLOAD_FILE, GET_CHANNEL_DETAILS } from "@/lib/constants";
 import apiClient from "@/lib/api-client";
+import { MentionsInput, Mention } from "react-mentions";
 
 const MessageBar = () => {
   const emojiRef = useRef();
@@ -21,6 +22,30 @@ const MessageBar = () => {
   const [message, setMessage] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const socket = useSocket();
+  const [channelMembers, setChannelMembers] = useState([]);
+
+  useEffect(() => {
+    const getChannelMembers = async () => {
+      if (selectedChatType === "channel") {
+        try {
+          const response = await apiClient.get(
+            `${GET_CHANNEL_DETAILS}/${selectedChatData._id}`,
+            { withCredentials: true }
+          );
+          const members = response.data.channel.members.map((member) => ({
+            id: member._id,
+            display: `${member.firstName} ${member.lastName}`,
+          }));
+          setChannelMembers(members);
+        } catch (error) {
+          console.log(error);
+        }
+      }
+    };
+    if (selectedChatData) {
+      getChannelMembers();
+    }
+  }, [selectedChatData, selectedChatType]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -36,10 +61,6 @@ const MessageBar = () => {
 
   const handleAddEmoji = (emoji) => {
     setMessage((msg) => msg + emoji.emoji);
-  };
-
-  const handleMessageChange = (event) => {
-    setMessage(event.target.value);
   };
 
   const handleSendMessage = async () => {
@@ -118,13 +139,59 @@ const MessageBar = () => {
   return (
     <div className="h-[10vh] bg-[#1c1d25] flex justify-center items-center px-8 gap-6 mb-5">
       <div className="flex-1 flex bg-[#2a2b33] rounded-md items-center gap-5 pr-5">
-        <input
-          type="text"
-          className="flex-1 p-5 bg-transparent rounded-md focus:border-none focus:outline-none"
-          placeholder="Enter message"
-          value={message}
-          onChange={handleMessageChange}
-        />
+        {selectedChatType === "channel" ? (
+          <MentionsInput
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Enter message"
+            className="flex-1 p-5 bg-transparent rounded-md focus:border-none focus:outline-none"
+            style={{
+              control: {
+                backgroundColor: "#2a2b33",
+                fontSize: "16px",
+                fontWeight: "normal",
+                color: "white",
+              },
+              input: {
+                margin: 0,
+                padding: "1.25rem",
+                border: "none",
+                outline: "none",
+                backgroundColor: "transparent",
+                color: "white",
+              },
+              suggestions: {
+                list: {
+                  backgroundColor: "black",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  fontSize: 14,
+                },
+                item: {
+                  padding: "5px 15px",
+                  borderBottom: "1px solid rgba(0,0,0,0.15)",
+                  "&focused": {
+                    backgroundColor: "#8417ff",
+                  },
+                },
+              },
+            }}
+          >
+            <Mention
+              trigger="@"
+              data={channelMembers}
+              appendSpaceOnAdd
+              style={{ backgroundColor: "#8417ff" }}
+            />
+          </MentionsInput>
+        ) : (
+          <input
+            type="text"
+            className="flex-1 p-5 bg-transparent rounded-md focus:border-none focus:outline-none"
+            placeholder="Enter message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        )}
         <button
           className="text-neutral-300 focus:border-none focus:outline-none focus:text-white transition-all duration-300"
           onClick={handleAttachmentClick} // Trigger the file input click

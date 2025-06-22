@@ -89,6 +89,7 @@ export const getUserInfo = async (request, response, next) => {
           image: userData.image,
           profileSetup: userData.profileSetup,
           color: userData.color,
+          isDmClosed: userData.isDmClosed,
         });
       } else {
         return response.status(404).send("User with the given id not found.");
@@ -200,6 +201,33 @@ export const removeProfileImage = async (request, response, next) => {
     return response
       .status(200)
       .json({ message: "Profile image removed successfully." });
+  } catch (error) {
+    console.log({ error });
+    return response.status(500).send("Internal Server Error.");
+  }
+};
+
+export const toggleDm = async (request, response, next) => {
+  try {
+    const { userId } = request;
+
+    if (!userId) {
+      return response.status(400).send("User ID is required.");
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return response.status(404).send("User not found.");
+    }
+
+    user.isDmClosed = !user.isDmClosed;
+    await user.save();
+
+    return response.status(200).json({
+      message: "DM status updated successfully.",
+      isDmClosed: user.isDmClosed,
+    });
   } catch (error) {
     console.log({ error });
     return response.status(500).send("Internal Server Error.");

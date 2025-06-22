@@ -29,7 +29,11 @@ const userSchema = new mongoose.Schema({
   },
   color: {
     type: Number,
-    required: false,
+    required: true,
+  },
+  isDmClosed: {
+    type: Boolean,
+    default: false,
   },
 });
 
